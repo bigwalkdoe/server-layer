@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Exec(docker-compose up)",
+      "Exec(./status.sh)"
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+# Environment variables with sensitive data
+.env
+.env.local
+.env.*.local
+
+# Docker files
+docker-compose.override.yml
+
+# Service credentials
+*.key
+*.pem
+credentials.json

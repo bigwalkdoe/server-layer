@@ -1,0 +1,125 @@
+version: '3.8'
+
+services:
+  # Nginx Web Server
+  nginx:
+    image: nginx:latest
+    container_name: nginx-web
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+      - "8443:443"
+    volumes:
+      - nginx-data:/usr/share/nginx/html
+      - nginx-config:/etc/nginx/nginx.conf:ro
+    networks:
+      - app-network
+    depends_on:
+      - app
+      - ollama
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Application Server (Example with Node.js)
+  app:
+    image: node:18-alpine
+    container_name: app-server
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=${APP_PORT:-3000}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:-appdb}
+      - DB_USER=${POSTGRES_USER:-appuser}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-apppass}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - app-network
+    depends_on:
+      - postgres
+      - redis
+    command:
+      - sh
+      - -c
+      - |
+        mkdir -p /app && echo 'const http = require("http"); const PORT = process.env.PORT || 3000; const server = http.createServer((req, res) => { console.log(req.method + " " + req.url); if (req.url === "/health") { res.writeHead(200, {"Content-Type": "application/json"}); res.end(JSON.stringify({status: "healthy", timestamp: new Date().toISOString()})); } else if (req.url === "/api/info") { res.writeHead(200, {"Content-Type": "application/json"}); res.end(JSON.stringify({message: "Server Layer Application", timestamp: new Date().toISOString(), database: {status: "configured", host: process.env.DB_HOST}, redis: {status: "configured", host: process.env.REDIS_HOST}})); } else if (req.url === "/api/data") { res.writeHead(200, {"Content-Type": "application/json"}); res.end(JSON.stringify({message: "Hello from Server Layer!", timestamp: new Date().toISOString(), random: Math.random()})); } else { res.writeHead(200, {"Content-Type": "text/html"}); res.end("<html><head><title>Server Layer App</title></head><body><h1>Server Layer Application</h1><p>Status: Running</p><p><a href=\"/health\">Health Check</a> | <a href=\"/api/info\">API Info</a> | <a href=\"/api/data\">Sample Data</a></p></body></html>"); } }); server.listen(PORT, () => { console.log("Server running on port " + PORT); }); process.on("SIGTERM", () => { console.log("SIGTERM signal received"); server.close(() => { console.log("HTTP server closed"); process.exit(0); }); });' > /app/index.js && node /app/index.js
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-appdb}
+      - POSTGRES_USER=${POSTGRES_USER:-appuser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-apppass}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    ports:
+      - "5435:5432"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-network
+    ports:
+      - "6379:6379"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Ollama AI Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-ai
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - app-network
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  app-data:
+  nginx-data:
+  nginx-config:
+  ollama-data:
