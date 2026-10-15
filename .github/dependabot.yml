@@ -1,0 +1,24 @@
+# Keep the actions in .github/workflows up to date.
+#
+# The workflow pins actions/checkout and actions/setup-node to immutable commit
+# SHAs. That is deliberate (a mutable tag can be repointed by the action's
+# owner), but it also means a security release for those actions will never
+# arrive on its own. Dependabot understands SHA pins and rewrites both the SHA
+# and its `# vX.Y.Z` comment, so the pin stays exact and the version stays
+# readable.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    # The workflows live in .github/workflows, which is relative to the root.
+    directory: "/"
+    schedule:
+      # Weekly is enough here; these two actions release rarely.
+      interval: "weekly"
+    # One pull request covering all action bumps instead of one PR per action.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      # Dependabot title: "ci: bump actions/checkout from 7.0.1 to 7.1.0".
+      prefix: "ci"

@@ -212,6 +212,8 @@ What is hardened:
   end-of-life in April 2025.)
 - CI actions are pinned to immutable commit SHAs rather than movable version
   tags, so a repointed tag cannot change what runs in CI without review.
+  `.github/dependabot.yml` proposes updates to those pins, so they do not go
+  stale.
 - Every service drops all capabilities and adds back only what it needs.
 - CPU and memory limits are set per service; `./status.sh` shows them in use.
 - nginx, the application and Redis run with a read-only root filesystem and
@@ -245,7 +247,9 @@ Known trade-offs, stated plainly rather than hidden:
 
 ```
 server-layer/
-├── .github/workflows/ci.yml    # shellcheck + unit tests + smoke test
+├── .github/
+│   ├── workflows/ci.yml        # shellcheck + unit tests + smoke test
+│   └── dependabot.yml          # keeps the SHA-pinned actions updated
 ├── app/                        # application source + Dockerfile (build context)
 │   ├── Dockerfile
 │   ├── server.js               # HTTP service; no runtime dependencies
