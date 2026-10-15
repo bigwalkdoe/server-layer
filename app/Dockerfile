@@ -1,6 +1,6 @@
 # The service uses only the Node standard library, so there is nothing to
 # install and this image builds with no network access.
-FROM node:24-alpine
+FROM node:25-alpine
 
 ENV NODE_ENV=production
 WORKDIR /app
