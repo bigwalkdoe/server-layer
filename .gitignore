@@ -1,0 +1,24 @@
+# Secrets
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+credentials.json
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Runtime output
+logs/
+containers/
+
+# Service data, if you switch a service to a bind mount
+volumes/postgres/
+volumes/redis/
+volumes/nginx/logs/
+
+# Generated development TLS certificate (never commit a private key)
+configs/nginx/certs/*
+!configs/nginx/certs/.gitkeep

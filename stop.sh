@@ -1,14 +1,17 @@
-#!/bin/bash
+#!/usr/bin/env bash
+#
+# Stop the server-layer stack.
+#
+# Named volumes (postgres-data, redis-data, ollama-data) are preserved, so no
+# data is lost. Use `docker compose -f configs/docker-compose.yml down -v` if you
+# really do want to destroy the volumes as well.
 
-# Server Layer Container Management Script
-# This script stops Docker containers using docker-compose
+set -euo pipefail
 
-set -e
+REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cd "$REPO_DIR/configs"
 
-# Change to configs directory where docker-compose files are located
-cd "$(dirname "$0")/configs"
+echo "Stopping the server-layer stack (volumes are preserved)..."
+docker compose down --remove-orphans
 
-echo "Stopping Docker containers..."
-docker-compose down
-
-echo "Containers stopped successfully!"
+echo "Containers stopped."

@@ -1,0 +1,7 @@
+# Tests are not part of the runtime image; server.js and lib/ are copied
+# explicitly, so this is belt-and-braces.
+test/
+node_modules/
+npm-debug.log*
+Dockerfile
+.dockerignore

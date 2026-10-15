@@ -6,11 +6,12 @@
     <title>Server Layer</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
             max-width: 800px;
             margin: 50px auto;
-            padding: 20px;
+            padding: 0 20px;
             background-color: #f5f5f5;
+            color: #212529;
         }
         .container {
             background-color: white;
@@ -19,62 +20,87 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         h1 {
-            color: #333;
             border-bottom: 2px solid #007bff;
             padding-bottom: 10px;
         }
-        .status {
-            margin: 20px 0;
-            padding: 15px;
-            border-radius: 4px;
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-        }
         .endpoint {
             margin: 10px 0;
-            padding: 10px;
+            padding: 10px 12px;
             background-color: #f8f9fa;
             border-left: 4px solid #007bff;
+        }
+        .endpoint a { font-weight: 600; }
+        .note {
+            margin-top: 24px;
+            padding: 12px 14px;
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 4px;
+            font-size: 0.95rem;
         }
         code {
             background-color: #f4f4f4;
             padding: 2px 6px;
             border-radius: 3px;
         }
+        footer {
+            margin-top: 24px;
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🚀 Server Layer</h1>
-        <div class="status">
-            <strong>Status:</strong> Running
-        </div>
-        
-        <h2>Available Endpoints:</h2>
-        
+        <h1>Server Layer</h1>
+
+        <p>This page is a static file served by nginx from
+           <code>volumes/nginx/html/index.html</code>. Every endpoint below is
+           proxied by nginx to the Node.js application.</p>
+
+        <h2>Endpoints</h2>
+
         <div class="endpoint">
-            <strong>Health Check:</strong><br>
-            <code>GET /health</code>
+            <a href="/health">/health</a><br>
+            Application liveness. Answers if the process is up; does not check
+            dependencies.
         </div>
-        
+
         <div class="endpoint">
-            <strong>API Info:</strong><br>
-            <code>GET /api/info</code>
+            <a href="/ready">/ready</a><br>
+            Readiness. Checks PostgreSQL and Redis reachability and returns
+            <code>503</code> when either is down.
         </div>
-        
+
         <div class="endpoint">
-            <strong>Sample Data:</strong><br>
-            <code>GET /api/data</code>
+            <a href="/api/info">/api/info</a><br>
+            Reports the observed reachability of PostgreSQL and Redis, not just
+            their configuration.
         </div>
-        
-        <h2>Services:</h2>
-        <ul>
-            <li>✅ Nginx (Web Server)</li>
-            <li>✅ Node.js Application</li>
-            <li>✅ PostgreSQL Database</li>
-            <li>✅ Redis Cache</li>
-        </ul>
+
+        <div class="endpoint">
+            <a href="/api/data">/api/data</a><br>
+            Sample payload cached in Redis. Repeat the request within
+            <code>CACHE_TTL_SECONDS</code> and <code>cached</code> flips to
+            <code>true</code>.
+        </div>
+
+        <div class="endpoint">
+            <code>/healthz</code><br>
+            nginx's own liveness probe. Not proxied to the application.
+        </div>
+
+        <div class="note">
+            <strong>TLS uses a self-signed development certificate.</strong> This
+            stack serves HTTP on port 8081 and HTTPS on 8443, and your browser
+            will warn about the certificate until you trust it. Replace it with a
+            real certificate before exposing this anywhere.
+        </div>
+
+        <footer>
+            Services: nginx &middot; app (Node.js) &middot; PostgreSQL &middot; Redis.
+            Ollama is available behind the optional <code>ai</code> Compose profile.
+        </footer>
     </div>
 </body>
 </html>

@@ -1,116 +1,234 @@
-version: '3.8'
+# Server Layer — Docker Compose stack
+#
+# Configuration comes from `configs/.env`. Compose loads that file automatically
+# because this file lives in the same directory; nothing needs to be exported by
+# hand. Start from the template:
+#
+#     cp configs/.env.example configs/.env
+#
+# POSTGRES_PASSWORD and REDIS_PASSWORD intentionally have no defaults: the stack
+# refuses to start rather than silently booting with a well-known password.
+#
+# No service sets `container_name`. That keeps the stack name-scoped, so it can
+# be run twice in parallel (different -p / COMPOSE_PROJECT_NAME) without the two
+# copies fighting over container names.
+
+name: server-layer
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-security: &security
+  security_opt:
+    - no-new-privileges:true
 
 services:
-  # Nginx Web Server
   nginx:
-    image: nginx:latest
-    container_name: nginx-web
+    image: nginx:1.31-alpine
     restart: unless-stopped
     ports:
-      - "8081:80"
-      - "8443:443"
+      # HTTP is served directly and HTTPS on 443. See conf.d/default.conf for why
+      # there is no HTTP -> HTTPS redirect here.
+      - "${NGINX_HTTP_PORT:-8081}:80"
+      - "${NGINX_HTTPS_PORT:-8443}:443"
     volumes:
-      - nginx-data:/usr/share/nginx/html
-      - nginx-config:/etc/nginx/nginx.conf:ro
+      # Bind mounts, not named volumes: a named volume over a *file* path is a
+      # Docker error, and a named volume over the html directory would hide the
+      # files in this repository behind the image's stock content.
+      #
+      # `:z` relabels the source files for container access. It is required on
+      # SELinux hosts (Fedora, RHEL, CentOS), where repository files otherwise
+      # carry a `user_home_t` label that the container is denied, and it is
+      # ignored on hosts without SELinux.
+      - ../configs/nginx/nginx.conf:/etc/nginx/nginx.conf:ro,z
+      - ../configs/nginx/conf.d:/etc/nginx/conf.d:ro,z
+      - ../configs/nginx/snippets:/etc/nginx/snippets:ro,z
+      - ../configs/nginx/certs:/etc/nginx/certs:ro,z
+      - ../volumes/nginx/html:/usr/share/nginx/html:ro,z
+    tmpfs:
+      # Needed because the root filesystem is read-only.
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - NET_BIND_SERVICE
+      - SETGID
+      - SETUID
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      # /healthz is answered by nginx itself; /health is proxied to the app.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
     networks:
       - app-network
-    depends_on:
-      - app
-      - ollama
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    <<: *security
+    logging: *logging
 
-  # Application Server (Example with Node.js)
   app:
-    image: node:18-alpine
-    container_name: app-server
+    build:
+      context: ../app
+    image: server-layer-app:local
     restart: unless-stopped
     environment:
-      - NODE_ENV=${NODE_ENV:-development}
-      - PORT=${APP_PORT:-3000}
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=${POSTGRES_DB:-appdb}
-      - DB_USER=${POSTGRES_USER:-appuser}
-      - DB_PASSWORD=${POSTGRES_PASSWORD:-apppass}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      NODE_ENV: production
+      PORT: "3000"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in configs/.env}
+      CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-30}
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
     networks:
       - app-network
-    depends_on:
-      - postgres
-      - redis
-    command:
-      - sh
-      - -c
-      - |
-        mkdir -p /app && echo 'const http = require("http"); const PORT = process.env.PORT || 3000; const server = http.createServer((req, res) => { console.log(req.method + " " + req.url); if (req.url === "/health") { res.writeHead(200, {"Content-Type": "application/json"}); res.end(JSON.stringify({status: "healthy", timestamp: new Date().toISOString()})); } else if (req.url === "/api/info") { res.writeHead(200, {"Content-Type": "application/json"}); res.end(JSON.stringify({message: "Server Layer Application", timestamp: new Date().toISOString(), database: {status: "configured", host: process.env.DB_HOST}, redis: {status: "configured", host: process.env.REDIS_HOST}})); } else if (req.url === "/api/data") { res.writeHead(200, {"Content-Type": "application/json"}); res.end(JSON.stringify({message: "Hello from Server Layer!", timestamp: new Date().toISOString(), random: Math.random()})); } else { res.writeHead(200, {"Content-Type": "text/html"}); res.end("<html><head><title>Server Layer App</title></head><body><h1>Server Layer Application</h1><p>Status: Running</p><p><a href=\"/health\">Health Check</a> | <a href=\"/api/info\">API Info</a> | <a href=\"/api/data\">Sample Data</a></p></body></html>"); } }); server.listen(PORT, () => { console.log("Server running on port " + PORT); }); process.on("SIGTERM", () => { console.log("SIGTERM signal received"); server.close(() => { console.log("HTTP server closed"); process.exit(0); }); });' > /app/index.js && node /app/index.js
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    <<: *security
+    logging: *logging
 
-  # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
-    container_name: postgres-db
+    image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-appdb}
-      - POSTGRES_USER=${POSTGRES_USER:-appuser}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-apppass}
+      POSTGRES_DB: ${POSTGRES_DB:-appdb}
+      POSTGRES_USER: ${POSTGRES_USER:-appuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in configs/.env}
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    ports:
+      # Bound to the loopback interface: reachable for debugging, not exposed
+      # to the network.
+      - "127.0.0.1:${POSTGRES_PORT:-5435}:5432"
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    healthcheck:
+      # $$ escapes the variable so Postgres expands it inside the container.
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
     networks:
       - app-network
-    ports:
-      - "5435:5432"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    <<: *security
+    logging: *logging
 
-  # Redis Cache
   redis:
-    image: redis:7-alpine
-    container_name: redis-cache
+    image: redis:8-alpine
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    # Redis has no network-level access control, so authentication is required
+    # rather than optional. The password is visible in the process arguments;
+    # see the README for the trade-off and the config-file alternative.
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in configs/.env}
     volumes:
       - redis-data:/data
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:?}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
     networks:
       - app-network
-    ports:
-      - "6379:6379"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    <<: *security
+    logging: *logging
 
-  # Ollama AI Service
+  # Optional, and not part of the default stack: `docker compose --profile ai up
+  # -d`. It is a multi-gigabyte image and is pointless on a machine without a
+  # usable GPU.
   ollama:
-    image: ollama/ollama:latest
-    container_name: ollama-ai
+    image: ollama/ollama:0.40.4
+    profiles:
+      - ai
     restart: unless-stopped
     volumes:
       - ollama-data:/root/.ollama
+    ports:
+      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 8G
     networks:
       - app-network
-    ports:
-      - "11434:11434"
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    <<: *security
+    logging: *logging
 
 networks:
   app-network:
@@ -119,7 +237,4 @@ networks:
 volumes:
   postgres-data:
   redis-data:
-  app-data:
-  nginx-data:
-  nginx-config:
   ollama-data:

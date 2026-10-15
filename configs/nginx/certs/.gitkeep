@@ -1,0 +1,2 @@
+Generated certificates (server.crt, server.key) are written here by
+./gen-dev-cert.sh and are gitignored. This file only keeps the directory.

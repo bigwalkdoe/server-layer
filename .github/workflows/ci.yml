@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shell:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax check
+        run: |
+          for script in start.sh stop.sh status.sh logs.sh smoke-test.sh gen-dev-cert.sh; do
+            bash -n "$script"
+            echo "  $script ok"
+          done
+
+      - name: shellcheck
+        run: shellcheck -S style start.sh stop.sh status.sh logs.sh smoke-test.sh gen-dev-cert.sh
+
+  unit:
+    name: Application unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # The service has no runtime dependencies, so there is nothing to install.
+      - name: Test
+        working-directory: app
+        run: npm test
+
+  smoke:
+    name: End-to-end smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Show Docker versions
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Validate compose configuration
+        env:
+          # The stack fails closed without these, by design; CI supplies
+          # throwaway values just to validate that the file parses.
+          POSTGRES_PASSWORD: ci-postgres
+          REDIS_PASSWORD: ci-redis
+        run: docker compose -f configs/docker-compose.yml config --quiet
+
+      - name: Smoke test
+        run: ./smoke-test.sh

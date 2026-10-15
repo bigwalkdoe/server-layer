@@ -1,196 +1,341 @@
-# Server Layer Configuration
+# Server Layer
 
-This folder contains Docker-based server operations configuration with containerized services management.
+[![CI](https://github.com/bigwalkdoe/server-layer/actions/workflows/ci.yml/badge.svg)](https://github.com/bigwalkdoe/server-layer/actions/workflows/ci.yml)
 
-## Directory Structure
+A small, self-contained Docker stack for local server work: nginx in front of a
+Node.js service, backed by PostgreSQL and Redis. Everything here is meant to be
+read, run and modified, and every claim below is checked by an automated test.
 
 ```
-server-layer/
-├── configs/           # Docker and service configurations
-│   ├── docker-compose.yml          # Main Docker Compose configuration
-│   ├── docker-compose.override.yml # Local development overrides
-│   ├── .env.example                # Environment variables template
-│   ├── logging.json                # Docker logging configuration
-│   ├── logrotate.conf             # Log rotation configuration
-│   └── nginx/                     # Nginx configuration files
-│       ├── nginx.conf             # Main nginx configuration
-│       └── conf.d/                # Site-specific configurations
-│           └── default.conf       # Default site configuration
-├── containers/         # Docker container data (auto-generated)
-├── logs/              # Application and service logs
-├── volumes/           # Persistent data volumes
-│   ├── nginx/         # Nginx data and logs
-│   │   ├── html/      # Static files
-│   │   └── logs/      # Nginx logs
-│   ├── postgres/      # PostgreSQL data and logs
-│   │   ├── data/      # Database files
-│   │   └── logs/      # Database logs
-│   ├── redis/         # Redis data and logs
-│   │   ├── data/      # Redis persistence
-│   │   └── logs/      # Redis logs
-│   └── app/           # Application files
-│       ├── package.json
-│       └── index.js
-├── start.sh          # Start all containers
-├── stop.sh           # Stop all containers
-├── status.sh         # Check container status
-├── logs.sh           # View container logs
-└── README.md         # This file
+browser ──► nginx :8081 (http)  ──┬─► static files (volumes/nginx/html)
+            nginx :8443 (https) ──┤
+                                  └─► app :3000 ──┬─► postgres :5432
+                                                  └─► redis    :6379
 ```
 
-## Quick Start
+## Requirements
 
-1. **Set up environment variables:**
-   ```bash
-   cd configs
-   cp .env.example .env
-   # Edit .env with your configuration values
-   ```
+- Docker Engine with the **Compose v2 plugin** (`docker compose`, not `docker-compose`)
+- `node` 20 or newer — only to run the application's unit tests locally
+- `curl` — only for `status.sh` and `smoke-test.sh`
+- `openssl` — only to generate the development TLS certificate
 
-2. **Configure your services:**
-   Edit `configs/docker-compose.yml` to add your services
+On an SELinux host (Fedora, RHEL, CentOS) no special steps are needed; the bind
+mounts already carry the `:z` flag. See [SELinux](#selinux) if you are curious
+why that matters.
 
-3. **Start containers:**
-   ```bash
-   ./start.sh
-   ```
+## Quick start
 
-4. **Check status:**
-   ```bash
-   ./status.sh
-   ```
+```bash
+git clone <this repo> && cd server-layer
 
-5. **View logs:**
-   ```bash
-   ./logs.sh
-   # Or for specific service:
-   ./logs.sh service-name
-   ```
+cp configs/.env.example configs/.env
+# edit configs/.env and set POSTGRES_PASSWORD and REDIS_PASSWORD
+#   openssl rand -base64 24
 
-6. **Stop containers:**
-   ```bash
-   ./stop.sh
-   ```
+./start.sh      # generate a dev certificate if needed, build + start
+./status.sh     # health and resource usage
+./logs.sh       # follow logs (./logs.sh app for one service)
+./stop.sh       # stop (named volumes are preserved)
+```
 
-## Management Scripts
+Then open <http://localhost:8081/> or <https://localhost:8443/>.
 
-### `start.sh`
-- Starts all Docker containers defined in docker-compose.yml
-- Loads environment variables from `.env` file if present
-- Runs containers in detached mode
+`start.sh` calls `./gen-dev-cert.sh` for you, so a fresh clone works with no
+manual step. The certificate is self-signed, so browsers will warn until you
+trust it; that is expected for local development.
 
-### `stop.sh`
-- Stops and removes all containers
-- Preserves volumes (data is not deleted)
+`POSTGRES_PASSWORD` and `REDIS_PASSWORD` have **no defaults on purpose**. If they
+are missing the stack refuses to start with an explanatory error, rather than
+booting a database with a password that is effectively public knowledge.
 
-### `status.sh`
-- Shows running container status
-- Displays resource usage statistics
+## Services
 
-### `logs.sh [service-name]`
-- Shows logs from all containers (or specific service)
-- Follows log output in real-time
-- Press Ctrl+C to exit
+| Service | Image | Container port | Published as | Notes |
+|---|---|---|---|---|
+| `nginx` | `nginx:1.31-alpine` | 80, 443 | `0.0.0.0:8081`, `0.0.0.0:8443` | reverse proxy, static files, TLS |
+| `app` | built from `app/` (`node:24-alpine`) | 3000 | *not published* | reachable only through nginx |
+| `postgres` | `postgres:17-alpine` | 5432 | `127.0.0.1:5435` | loopback only |
+| `redis` | `redis:8-alpine` | 6379 | `127.0.0.1:6379` | loopback only, password required |
+| `ollama` | `ollama/ollama:0.40.4` | 11434 | `127.0.0.1:11434` | optional, `ai` profile — see below |
 
-## Full Stack Configuration
+The application has no host port. It is reachable only via nginx, which is the
+only service deliberately exposed to the network. The database and cache are
+bound to the loopback interface so you can attach a local client for debugging
+without publishing them to your LAN.
 
-This setup comes pre-configured with a complete full stack:
+### TLS
 
-### Services Included:
-- **Nginx** (Port 80/443) - Web server and reverse proxy
-- **Node.js Application** (Port 3000) - Express.js backend server
-- **PostgreSQL** (Port 5432) - Relational database
-- **Redis** (Port 6379) - In-memory cache
+nginx terminates TLS on 443 with a self-signed certificate generated by
+`./gen-dev-cert.sh` and mounted from `configs/nginx/certs/`. The private key is
+mode `600` and gitignored. Only TLS 1.2 and 1.3 are enabled.
 
-### Service Communication:
-- Nginx proxies requests to the Node.js application
-- Application connects to PostgreSQL for data storage
-- Application uses Redis for caching
-- All services communicate via Docker network `app-network`
+Replace the certificate with a real one — obtained from Let's Encrypt or your
+organisation — before exposing this stack. Drop your files in
+`configs/nginx/certs/` as `server.crt` and `server.key`, or point
+`ssl_certificate` at wherever your certificates live.
 
-### Sample Endpoints:
-- `http://localhost/` - Static HTML page
-- `http://localhost/health` - Health check endpoint
-- `http://localhost/api/info` - System information
-- `http://localhost/api/data` - Sample data with Redis caching
+HTTP is **served, not redirected**, and that is deliberate. A correct redirect
+needs the external port, which nginx cannot derive from the internal one: this
+stack publishes 8443 on the host, so `return 301 https://$host$request_uri`
+would send clients to port 443 and break. For a single-port deployment,
+`conf.d/default.conf` documents the two-line replacement.
 
-### Application Structure:
-The sample Node.js application in `volumes/app/` includes:
-- Express.js server with REST API
-- PostgreSQL connection and table initialization
-- Redis caching for performance
-- Graceful shutdown handling
+There is no HSTS header either: pinning `Strict-Transport-Security` while serving
+a self-signed certificate is a good way to lock yourself out of your own
+development stack.
+
+## Endpoints
+
+| Path | Served by | Behaviour |
+|---|---|---|
+| `/` | nginx | the landing page, a static file |
+| `/static/*` | nginx | static assets, `Cache-Control` via `expires 30d` |
+| `/healthz` | nginx | nginx's own liveness probe |
+| `/health` | app | application liveness — **does not** check dependencies |
+| `/ready` | app | readiness; `503` when PostgreSQL or Redis is unreachable |
+| `/api/info` | app | reports *observed* reachability of PostgreSQL and Redis |
+| `/api/data` | app | sample payload cached in Redis for `CACHE_TTL_SECONDS` |
+
+Every endpoint is available over both HTTP and HTTPS, since HTTP and HTTPS share
+the same server configuration (`configs/nginx/snippets/server.conf`).
+
+Note the deliberate split between `/health` and `/ready`:
+
+- `/health` answers whenever the process is up, so it is safe as a container
+  liveness probe.
+- `/ready` is the one that fails when a dependency is down, so it is what a load
+  balancer should use.
+
+nginx does **not** answer `/health` itself. A canned `200` in nginx would hide a
+dead backend from every health checker behind it, which is a mistake this repo
+used to make.
 
 ## Configuration
 
-### Docker Compose
-Main configuration is in `configs/docker-compose.yml`. Add your services following the commented examples.
+`configs/.env` is loaded by Compose automatically — the compose file lives in
+that directory, so nothing needs to be exported. Every variable below is
+actually consumed; there is no dead configuration.
 
-### Environment Variables
-Copy `configs/.env.example` to `configs/.env` and configure:
+| Variable | Default | Required | Purpose |
+|---|---|---|---|
+| `POSTGRES_PASSWORD` | — | yes | database password |
+| `REDIS_PASSWORD` | — | yes | cache password (`requirepass`) |
+| `POSTGRES_DB` | `appdb` | no | database created on first start |
+| `POSTGRES_USER` | `appuser` | no | database user |
+| `NGINX_HTTP_PORT` | `8081` | no | host port for HTTP |
+| `NGINX_HTTPS_PORT` | `8443` | no | host port for HTTPS |
+| `POSTGRES_PORT` | `5435` | no | host (loopback) port for PostgreSQL |
+| `REDIS_PORT` | `6379` | no | host (loopback) port for Redis |
+| `OLLAMA_PORT` | `11434` | no | host (loopback) port for Ollama |
+| `CACHE_TTL_SECONDS` | `30` | no | TTL for `/api/data`'s Redis entry |
 
-**Important: Change the default PostgreSQL password!**
+### Optional Ollama profile
+
+Ollama is a multi-gigabyte image and is useless on a machine without a usable
+GPU, so it is **not** part of the default stack:
+
 ```bash
-POSTGRES_PASSWORD=your_secure_password
+docker compose -f configs/docker-compose.yml --profile ai up -d ollama
 ```
 
-**Key Variables:**
-- `NODE_ENV` - Environment (development/production)
-- `APP_PORT` - Application port (default: 3000)
-- `POSTGRES_DB` - Database name (default: appdb)
-- `POSTGRES_USER` - Database user (default: appuser)
-- `POSTGRES_PASSWORD` - Database password (CHANGE THIS!)
-- `REDIS_HOST` - Redis host (default: redis)
-- `REDIS_PORT` - Redis port (default: 6379)
+## Management scripts
 
-### Local Development
-Use `docker-compose.override.yml` for development-specific overrides without modifying the main configuration.
+| Script | Purpose |
+|---|---|
+| `./start.sh` | validates prerequisites, generates a dev certificate if needed, then `docker compose up -d --build` |
+| `./stop.sh` | `docker compose down` — named volumes are preserved |
+| `./status.sh` | container states, `/ready`, and `docker stats` |
+| `./logs.sh [service]` | follows logs; `exec`s into Compose so Ctrl+C works |
+| `./gen-dev-cert.sh` | generates the self-signed TLS certificate; idempotent, `FORCE=1` to replace |
+| `./smoke-test.sh` | end-to-end verification of the running stack (see below) |
 
-### Logging
-- Docker logs are configured in `configs/logging.json`
-- Application logs are stored in `logs/` directory
-- Log rotation is configured in `configs/logrotate.conf`
+## Testing
 
-## Volume Management
+Two layers of tests, plus CI that also lints the shell scripts. Both layers are
+runnable offline once the images are present.
 
-Persistent data is stored in the `volumes/` directory:
-- Create subdirectories for each service
-- Mount these directories in docker-compose.yml
-- Data persists even when containers are stopped
+**Unit tests** — the application's HTTP behaviour and its Redis protocol client,
+plus a reachability probe. They run against a real RESP-speaking TCP server and
+real sockets, not mock objects:
 
-## Best Practices
+```bash
+cd app && npm test        # or: node --test test/*.test.js
+```
 
-1. **Never commit sensitive data** - `.env` is gitignored
-2. **Use override file for local development** - Keep main config production-ready
-3. **Monitor logs regularly** - Use `./logs.sh` to watch for issues
-4. **Backup volumes** - Regular backup of data in `volumes/` directory
-5. **Update images** - Pull latest images and restart containers periodically
+**End-to-end smoke test** — builds the stack and asserts the contract of the
+running system:
+
+```bash
+./smoke-test.sh
+```
+
+It runs under an isolated Compose project name and a throwaway env file, so it
+never touches `configs/.env`, never collides with a stack you already have
+running, and removes its containers and volumes when it finishes. It asserts,
+among other things, that:
+
+- the compose file is warning-free and every image is pinned
+- nginx starts (the previous configuration made this impossible)
+- the landing page, static assets and `/healthz` come from this repository
+- `/health`, `/ready`, `/api/info` are proxied to the application
+- the Redis cache round-trips through nginx (miss, then hit)
+- TLS is real: the handshake negotiates TLS 1.2/1.3, the presented certificate is
+  the generated one with the expected SAN, and `curl --cacert` verifies it
+  (so it is genuine TLS, not merely `-k`)
+- the certificate generator is idempotent
+- Redis rejects unauthenticated clients and PostgreSQL rejects the old default
+  password, *measured from outside the containers*
+- the app, database and cache are not exposed beyond the loopback interface
+- the containers run with `no-new-privileges`, all capabilities dropped, and a
+  read-only root filesystem for nginx/app/redis
+- the run did not modify the working tree
+
+`KEEP_UP=1 ./smoke-test.sh` leaves the stack running for inspection and prints
+the command to tear it down.
+
+CI (`.github/workflows/ci.yml`) runs three jobs on every push and pull request:
+`shellcheck` and `bash -n` over the scripts, the unit tests, and the full smoke
+test.
+
+## Security posture
+
+What is hardened:
+
+- Secrets are required, never defaulted. Compose fails closed.
+- Only nginx is published to the network; the database and cache are loopback-only.
+- Redis requires a password. It has no network-level access control, so this is
+  not optional.
+- Images are pinned to explicit tags, and the Node runtime is a supported LTS
+  release. (The stack previously pinned `node:18-alpine`, which reached
+  end-of-life in April 2025.)
+- Every service drops all capabilities and adds back only what it needs.
+- CPU and memory limits are set per service; `./status.sh` shows them in use.
+- nginx, the application and Redis run with a read-only root filesystem and
+  explicit `tmpfs` for the few paths that need to be writable.
+- nginx hides its version and sets `X-Content-Type-Options`,
+  `X-Frame-Options` and `Referrer-Policy`.
+- nginx terminates TLS with only TLS 1.2 and 1.3 enabled.
+- Every service has a healthcheck, and dependencies wait for
+  `condition: service_healthy` instead of merely for start order.
+
+Known trade-offs, stated plainly rather than hidden:
+
+- **The TLS certificate is self-signed.** It is generated locally for
+  development. Replace it before exposing the stack, and add HSTS once you have
+  a certificate clients actually trust.
+- **HTTP is not redirected to HTTPS.** Explained under [TLS](#tls); the port
+  mapping makes a correct redirect non-trivial in this layout.
+- **The Redis password appears in the container's process arguments.** It is
+  also interpolated into the healthcheck command and is therefore visible to
+  anyone who can run `docker inspect`. The alternative is mounting a
+  `redis.conf` that contains the password in plaintext — the same exposure with
+  more moving parts. Use a secrets manager if that matters for your threat model.
+- **The Postgres image trusts connections from inside its own container.** That
+  is upstream behaviour: the generated `pg_hba.conf` has `trust` for `local`,
+  `127.0.0.1/32` and `::1/128`, and `scram-sha-256` for everything else. Only
+  someone who can already `docker exec` into the database container benefits, and
+  they would have the password from the environment anyway — but it is worth
+  knowing that an in-container `psql` needs no password.
+
+## Layout
+
+```
+server-layer/
+├── .github/workflows/ci.yml    # shellcheck + unit tests + smoke test
+├── app/                        # application source + Dockerfile (build context)
+│   ├── Dockerfile
+│   ├── server.js               # HTTP service; no runtime dependencies
+│   ├── lib/redis.js            # minimal RESP client
+│   ├── lib/probe.js            # TCP reachability probe
+│   └── test/                   # node:test suites
+├── configs/
+│   ├── docker-compose.yml      # the whole stack
+│   ├── .env.example            # template; copy to .env
+│   ├── .gitignore
+│   └── nginx/
+│       ├── nginx.conf          # main config, includes conf.d/*.conf
+│       ├── conf.d/default.conf # HTTP and HTTPS server blocks
+│       ├── snippets/server.conf # shared proxy/static/header config
+│       └── certs/              # generated certificate (gitignored) + .gitkeep
+├── volumes/
+│   └── nginx/html/             # static content, bind-mounted read-only
+│       ├── index.html
+│       └── static/asset.txt
+├── start.sh  stop.sh  status.sh  logs.sh  gen-dev-cert.sh
+├── smoke-test.sh               # end-to-end verification
+├── LICENSE
+└── README.md
+```
+
+`volumes/` holds only content that is *served* or *mounted*. Data lives in named
+Docker volumes (`postgres-data`, `redis-data`, `ollama-data`), so `git status`
+stays clean while the stack runs.
+
+The application deliberately has **no runtime dependencies**: it uses only the
+Node standard library, so the image builds without network access and the tests
+need no install step. That is also why `lib/redis.js` is a small hand-written
+RESP client rather than the `redis` package — it needs `AUTH`, `PING`, `GET` and
+`SETEX` and nothing else. A production service should use the official client,
+which adds connection pooling, reconnection and cluster support.
+
+## Live configuration
+
+`configs/nginx/nginx.conf`, `configs/nginx/conf.d`,
+`configs/nginx/snippets` and `volumes/nginx/html` are **bind mounts**. That means
+they are live: edit a file and reload nginx, with no rebuild.
+
+```bash
+docker compose -f configs/docker-compose.yml exec nginx nginx -s reload
+```
+
+This is worth calling out because the previous configuration used *named
+volumes* for these paths, which was actively broken in two different ways: a
+named volume over the `nginx.conf` **file** path makes Docker refuse to start
+the container at all (`not a directory`), and a named volume over the html
+directory hides your files behind the image's stock "Welcome to nginx!" page.
 
 ## Troubleshooting
 
-### Containers won't start
+**`error: configs/.env is missing`** — run
+`cp configs/.env.example configs/.env` and set the two required secrets.
+
+**`required variable POSTGRES_PASSWORD is missing a value`** — the same thing
+seen from Compose. The variable is unset or empty.
+
+**Port already in use** — another service is on 8081, 8443, 5435 or 6379. Change
+`NGINX_HTTP_PORT`, `NGINX_HTTPS_PORT` etc. in `configs/.env`.
+
+**`permission denied` reading a bind-mounted file** — on SELinux hosts the
+`:z` flag on the mount is what grants access; those flags are already present.
+See [SELinux](#selinux).
+
+**nginx crash-loops on startup** — get the reason from
+`./logs.sh nginx`; a configuration error is reported there verbatim.
+
+**`cannot load certificate ... No such file or directory`** — the certificate is
+missing. Run `./gen-dev-cert.sh` (or just `./start.sh`, which does it for you).
+
+**The browser warns about the certificate** — expected: it is self-signed. Trust
+it locally, or use `curl -k`. To rotate it: `FORCE=1 ./gen-dev-cert.sh` followed
+by `docker compose -f configs/docker-compose.yml restart nginx`.
+
+**Start over completely** — this deletes all database and cache data:
+
 ```bash
-cd configs
-docker-compose up --no-deps service-name  # Check service config
-docker-compose logs service-name          # Check logs
+docker compose -f configs/docker-compose.yml down -v
+./start.sh
 ```
 
-### Permission issues
-```bash
-sudo chown -R $USER:$USER volumes/ logs/
-```
+### SELinux
 
-### Clean restart
-```bash
-cd configs
-docker-compose down -v  # Stops and removes volumes
-./start.sh              # Restart fresh
-```
+On Fedora, RHEL and CentOS, files under a home directory carry the
+`user_home_t` label. A container process is confined by `container_t` and is
+denied read access to anything with that label, which surfaces as a bare
+`Permission denied` with no indication of the cause. The `:z` suffix on the
+bind mounts relabels the source files for container access and is a no-op on
+hosts that do not use SELinux.
 
-## Adding New Services
+## License
 
-1. Edit `configs/docker-compose.yml`
-2. Add service definition following existing examples
-3. Create necessary volume directories in `volumes/`
-4. Add environment variables to `.env`
-5. Restart: `./stop.sh && ./start.sh`
+[MIT](LICENSE) © 2026 bigwalkdoe.

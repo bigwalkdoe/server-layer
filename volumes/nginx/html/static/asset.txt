@@ -1,0 +1,1 @@
+Static asset served by nginx from volumes/nginx/html/static.
