@@ -1,24 +1,64 @@
-# Keep the actions in .github/workflows up to date.
+# Keep the pinned dependencies in this repository up to date.
 #
-# The workflow pins actions/checkout and actions/setup-node to immutable commit
-# SHAs. That is deliberate (a mutable tag can be repointed by the action's
-# owner), but it also means a security release for those actions will never
-# arrive on its own. Dependabot understands SHA pins and rewrites both the SHA
-# and its `# vX.Y.Z` comment, so the pin stays exact and the version stays
-# readable.
+# Everything here is pinned deliberately: actions to commit SHAs, images to
+# explicit tags. Pinning buys reproducibility, but nothing moves on its own, so a
+# security release would otherwise go unnoticed. Dependabot understands SHA pins
+# and rewrites both the SHA and its `# vX.Y.Z` comment, which keeps the pin exact
+# and the version readable.
+#
+# Each group covers minor and patch updates only. A major bump deliberately falls
+# outside the group and arrives as its own pull request, so it cannot ride along
+# unnoticed inside a routine batch. CI runs on these pull requests.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
     # The workflows live in .github/workflows, which is relative to the root.
     directory: "/"
     schedule:
-      # Weekly is enough here; these two actions release rarely.
       interval: "weekly"
-    # One pull request covering all action bumps instead of one PR per action.
     groups:
       github-actions:
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
     commit-message:
-      # Dependabot title: "ci: bump actions/checkout from 7.0.1 to 7.1.0".
       prefix: "ci"
+
+  # The compose file's images: nginx, postgres, redis and ollama.
+  - package-ecosystem: "docker-compose"
+    directory: "/configs"
+    schedule:
+      interval: "weekly"
+    ignore:
+      # Built locally from ../app by this same compose file. There is no registry
+      # image behind this tag, so there is nothing for Dependabot to update.
+      - dependency-name: "server-layer-app"
+    groups:
+      compose-images:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "docker-compose"
+
+  # The application image's base: FROM node:24-alpine in app/Dockerfile.
+  - package-ecosystem: "docker"
+    directory: "/app"
+    schedule:
+      interval: "weekly"
+    groups:
+      base-images:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    commit-message:
+      prefix: "docker"
+    # No ignore rule for the Node major: the group above covers minor and patch,
+    # so a major (24 -> 26) arrives as its own pull request. That keeps the
+    # change isolated without hiding it.
