@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# Third-party actions are pinned to immutable commit SHAs, with the human-readable
+# version in a trailing comment. A mutable tag such as `@v7` can be repointed by
+# the action's owner, so a pinned SHA is the only thing that guarantees the code
+# running here is the code that was reviewed. Bump the SHA and the comment
+# together.
 # Cancel superseded runs on the same ref.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,7 +20,7 @@ jobs:
     name: Shell scripts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Syntax check
         run: |
@@ -31,9 +36,9 @@ jobs:
     name: Application unit tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           # This service has no dependencies, no lockfile and no install step,
@@ -51,9 +56,9 @@ jobs:
     name: End-to-end smoke test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           # Nothing is installed here either; see the unit-test job.

@@ -210,6 +210,8 @@ What is hardened:
 - Images are pinned to explicit tags, and the Node runtime is a supported LTS
   release. (The stack previously pinned `node:18-alpine`, which reached
   end-of-life in April 2025.)
+- CI actions are pinned to immutable commit SHAs rather than movable version
+  tags, so a repointed tag cannot change what runs in CI without review.
 - Every service drops all capabilities and adds back only what it needs.
 - CPU and memory limits are set per service; `./status.sh` shows them in use.
 - nginx, the application and Redis run with a read-only root filesystem and
