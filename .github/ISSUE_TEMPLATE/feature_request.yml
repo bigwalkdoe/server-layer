@@ -1,0 +1,55 @@
+name: Feature request
+description: A new capability or configuration option
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. This project is intentionally small and opinionated — a feature
+        that fits the way the stack already runs is much more likely to land
+        than one that needs a new way of running it. Describing the pain you
+        have today is the useful part.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checked
+      options:
+        - label: I searched existing issues and pull requests.
+          required: true
+        - label: This is not about a security vulnerability (see SECURITY.md).
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: The situation you're in, not the solution you want.
+      placeholder: "I need to run two of these stacks side by side, and they collide on..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: How you'd build it
+      description: Sketch is fine. A config shape, a new script, a new service.
+      placeholder: "Add an NGINXTLS_ env var, and propagate it through ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Other things you considered
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: primacy
+    attributes:
+      label: Willingness
+      options:
+        - label: I'm willing to open the pull request with the checks passing.
+          required: false

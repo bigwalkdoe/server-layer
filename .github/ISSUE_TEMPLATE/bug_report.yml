@@ -1,0 +1,88 @@
+name: Bug report
+description: Something isn't working in the stack or a script
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Filling in the details below lets me reproduce
+        the problem without a round-trip. Please run every step before
+        posting — most "it doesn't work" reports are covered by the README's
+        [Troubleshooting](../README.md#troubleshooting) section.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checked
+      options:
+        - label: I read the README, including Troubleshooting.
+          required: true
+        - label: I copied `configs/.env.example` to `configs/.env` before configuring.
+          required: false
+        - label: This is not a security vulnerability (see SECURITY.md).
+          required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Host OS / SELinux
+      description: e.g. "Fedora 43, SELinux Enforcing", "Ubuntu 24.04, SELinux Disabled"
+      placeholder: "Fedora 43, SELinux Enforcing"
+    validations:
+      required: true
+
+  - type: input
+    id: docker
+    attributes:
+      label: Docker / Compose versions
+      placeholder: "Docker 29.8, Compose 5.6"
+    validations:
+      required: true
+
+  - type: input
+    id: ports
+    attributes:
+      label: Host ports used
+      description: The defaults are 8081 (HTTP) and 8443 (HTTPS).
+      placeholder: "NGINX_HTTP_PORT=8081 NGINX_HTTPS_PORT=8443"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: From `git clone` if you can, so I can paste and run.
+      placeholder: |
+        1. git clone ...
+        2. cp configs/.env.example configs/.env
+        3. ./start.sh
+        4. ./smoke-test.sh
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What actually happened
+      description: Paste the output of `./logs.sh` (not just what you saw).
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Redacted config
+      description: Contents of `configs/.env` with passwords and any secrets removed.
+      render: shell
+    validations:
+      required: false
