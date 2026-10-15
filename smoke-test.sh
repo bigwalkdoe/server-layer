@@ -204,12 +204,23 @@ expect_eq "HTTPS /ready reports ready" "true" \
 expect_eq "HTTPS static content is served" 200 \
   "$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 "$SECURE/static/asset.txt")"
 
-# Prove TLS is real and is the generated certificate, not a fallback: the
-# handshake must negotiate a TLS version and present our SAN.
-CERT_SUBJECT=$(openssl s_client -connect "127.0.0.1:${HTTPS_PORT}" -servername localhost </dev/null 2>/dev/null \
-  | openssl x509 -noout -subject -ext subjectAltName 2>/dev/null || true)
-expect_contains "HTTPS presents the generated certificate" "$CERT_SUBJECT" "CN=localhost"
-expect_contains "the certificate covers 127.0.0.1 via SAN" "$CERT_SUBJECT" "127.0.0.1"
+# Prove TLS is real and that nginx serves exactly the generated certificate.
+#
+# The fingerprint is the version-independent proof. openssl formats subject lines
+# differently between releases ("CN = localhost" in 3.0, "CN=localhost" in 3.5),
+# so the subject is compared with whitespace stripped rather than raw — matching
+# the raw text made this assertion depend on the openssl version.
+SERVED_CERT=$(openssl s_client -connect "127.0.0.1:${HTTPS_PORT}" -servername localhost </dev/null 2>/dev/null \
+  | openssl x509 -noout -fingerprint -sha256 -subject -ext subjectAltName 2>/dev/null || true)
+
+SERVED_FP=$(printf '%s\n' "$SERVED_CERT" | sed -n 's/.*[Ff]ingerprint=//p' | tr -d ' \r' | head -n1)
+FILE_FP=$(openssl x509 -in "$REPO_DIR/configs/nginx/certs/server.crt" -noout -fingerprint -sha256 \
+  | sed -n 's/.*[Ff]ingerprint=//p' | tr -d ' \r')
+
+expect_eq "nginx serves exactly the generated certificate" "$FILE_FP" "$SERVED_FP"
+expect_contains "the served certificate is issued for localhost" \
+  "$(printf '%s' "$SERVED_CERT" | tr -d ' ')" "CN=localhost"
+expect_contains "the certificate covers 127.0.0.1 via SAN" "$SERVED_CERT" "127.0.0.1"
 
 TLS_VERSION=$(openssl s_client -connect "127.0.0.1:${HTTPS_PORT}" -servername localhost </dev/null 2>/dev/null \
   | grep -oE 'TLSv1\.[23]' | head -n1 || true)

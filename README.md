@@ -180,9 +180,10 @@ among other things, that:
 - the landing page, static assets and `/healthz` come from this repository
 - `/health`, `/ready`, `/api/info` are proxied to the application
 - the Redis cache round-trips through nginx (miss, then hit)
-- TLS is real: the handshake negotiates TLS 1.2/1.3, the presented certificate is
-  the generated one with the expected SAN, and `curl --cacert` verifies it
-  (so it is genuine TLS, not merely `-k`)
+- TLS is real: the handshake negotiates TLS 1.2/1.3, the certificate nginx
+  presents matches the generated file by SHA-256 fingerprint and carries the
+  expected SAN, and `curl --cacert` verifies it (so it is genuine TLS, not
+  merely `-k`)
 - the certificate generator is idempotent
 - Redis rejects unauthenticated clients and PostgreSQL rejects the old default
   password, *measured from outside the containers*
