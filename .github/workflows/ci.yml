@@ -15,7 +15,7 @@ jobs:
     name: Shell scripts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Syntax check
         run: |
@@ -31,11 +31,16 @@ jobs:
     name: Application unit tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
+          # This service has no dependencies, no lockfile and no install step,
+          # so there is nothing to cache. Pinned off explicitly so that adding a
+          # `packageManager` field later cannot silently enable cache setup that
+          # would then fail looking for a lockfile.
+          package-manager-cache: false
 
       # The service has no runtime dependencies, so there is nothing to install.
       - name: Test
@@ -46,11 +51,13 @@ jobs:
     name: End-to-end smoke test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
+          # Nothing is installed here either; see the unit-test job.
+          package-manager-cache: false
 
       - name: Show Docker versions
         run: |
