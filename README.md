@@ -1,6 +1,6 @@
-# Server Layer
+# Spectre Server Layer
 
-[![CI](https://github.com/bigwalkdoe/server-layer/actions/workflows/ci.yml/badge.svg)](https://github.com/bigwalkdoe/server-layer/actions/workflows/ci.yml)
+[![CI](https://github.com/bigwalkdoe/spectre-server-layer/actions/workflows/ci.yml/badge.svg)](https://github.com/bigwalkdoe/spectre-server-layer/actions/workflows/ci.yml)
 
 A small, self-contained Docker stack for local server work: nginx in front of a
 Node.js service, backed by PostgreSQL and Redis. Everything here is meant to be
@@ -27,7 +27,7 @@ why that matters.
 ## Quick start
 
 ```bash
-git clone <this repo> && cd server-layer
+git clone <this repo> && cd spectre-server-layer
 
 cp configs/.env.example configs/.env
 # edit configs/.env and set POSTGRES_PASSWORD and REDIS_PASSWORD
@@ -248,7 +248,7 @@ Known trade-offs, stated plainly rather than hidden:
 ## Layout
 
 ```
-server-layer/
+spectre-server-layer/
 ├── .github/
 │   ├── workflows/ci.yml        # shellcheck + unit tests + smoke test
 │   └── dependabot.yml          # tracks the pinned actions and image tags

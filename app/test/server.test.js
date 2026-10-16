@@ -121,7 +121,7 @@ test('GET /api/data generates a fresh payload on a cache miss', async (t) => {
 
   assert.equal(response.status, 200);
   assert.equal(body.cached, false);
-  assert.equal(body.message, 'Hello from Server Layer!');
+  assert.equal(body.message, 'Hello from Spectre Server Layer!');
   assert.equal(typeof body.random, 'number');
 });
 

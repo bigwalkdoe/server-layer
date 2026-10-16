@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# End-to-end smoke test for the server-layer stack.
+# End-to-end smoke test for the spectre-server-layer stack.
 #
 # Builds and runs the whole stack under an isolated Compose project name and a
 # throwaway env file, asserts the observable contract of the running system,
@@ -18,7 +18,7 @@ set -uo pipefail
 REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 COMPOSE_FILE="$REPO_DIR/configs/docker-compose.yml"
 
-PROJECT="server-layer-smoke-$$"
+PROJECT="spectre-server-layer-smoke-$$"
 HTTP_PORT=${HTTP_PORT:-18081}
 HTTPS_PORT=${HTTPS_PORT:-18443}
 POSTGRES_PORT=${POSTGRES_PORT:-15435}
@@ -29,7 +29,7 @@ SECURE="https://127.0.0.1:${HTTPS_PORT}"
 POSTGRES_PASSWORD="smoke-postgres-$$"
 REDIS_PASSWORD="smoke-redis-$$"
 
-TMP_ENV=$(mktemp -t server-layer-smoke-env.XXXXXX)
+TMP_ENV=$(mktemp -t spectre-server-layer-smoke-env.XXXXXX)
 chmod 600 "$TMP_ENV"
 
 pass=0
@@ -99,7 +99,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-printf 'server-layer smoke test (project %s)\n' "$PROJECT"
+printf 'spectre-server-layer smoke test (project %s)\n' "$PROJECT"
 printf '%s\n' '---------------------------------------------------------------'
 
 # ---------------------------------------------------------------- preflight --
@@ -177,7 +177,7 @@ expect_eq "GET /healthz is 200" 200 "$(http_status "$BASE/healthz")"
 expect_eq "GET /healthz is a liveness probe only" "ok" "$(http_body "$BASE/healthz" | tr -d '\n')"
 
 HOME_HTML=$(http_body "$BASE/")
-expect_contains "GET / serves the repository's own index.html" "$HOME_HTML" "Server Layer"
+expect_contains "GET / serves the repository's own index.html" "$HOME_HTML" "Spectre Server Layer"
 expect_not_contains "GET / does not serve the stock nginx page" "$HOME_HTML" "Welcome to nginx"
 
 expect_eq "GET /static/asset.txt is 200" 200 "$(http_status "$BASE/static/asset.txt")"
@@ -196,7 +196,7 @@ expect_eq "gen-dev-cert.sh is idempotent" "$CERT_FINGERPRINT_BEFORE" "$CERT_FING
 expect_eq "HTTPS GET /healthz is 200" 200 \
   "$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 "$SECURE/healthz")"
 expect_contains "HTTPS serves the repository's landing page" \
-  "$(curl -sk --max-time 10 "$SECURE/")" "Server Layer"
+  "$(curl -sk --max-time 10 "$SECURE/")" "Spectre Server Layer"
 expect_eq "HTTPS GET /health is proxied to the app" 200 \
   "$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 "$SECURE/health")"
 expect_eq "HTTPS /ready reports ready" "true" \

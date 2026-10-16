@@ -1,8 +1,8 @@
 {
-  "name": "server-layer-app",
+  "name": "spectre-server-layer-app",
   "version": "1.0.0",
   "private": true,
-  "description": "Zero-dependency HTTP service for the server-layer stack",
+  "description": "Zero-dependency HTTP service for the spectre-server-layer stack",
   "main": "server.js",
   "engines": {
     "node": ">=20"

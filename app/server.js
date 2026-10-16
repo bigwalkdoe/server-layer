@@ -5,7 +5,7 @@ const http = require('http');
 const { createRedisClient } = require('./lib/redis');
 const { probeTcp } = require('./lib/probe');
 
-const CACHE_KEY = 'server-layer:api-data';
+const CACHE_KEY = 'spectre-server-layer:api-data';
 
 function configFromEnv(env = process.env) {
   return {
@@ -102,7 +102,7 @@ function createServer(config, { logger = console } = {}) {
         return {
           status: 200,
           body: {
-            message: 'Server Layer Application',
+            message: 'Spectre Server Layer Application',
             timestamp: new Date().toISOString(),
             version: process.env.npm_package_version || null,
             database: { host: config.db.host, port: config.db.port, reachable: checks.postgres },
@@ -123,7 +123,7 @@ function createServer(config, { logger = console } = {}) {
         }
 
         const payload = {
-          message: 'Hello from Server Layer!',
+          message: 'Hello from Spectre Server Layer!',
           random: Math.random(),
           generatedAt: new Date().toISOString(),
         };

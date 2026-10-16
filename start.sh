@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Start the server-layer stack.
+# Start the spectre-server-layer stack.
 #
 # There is deliberately no `export $(cat .env | xargs)` here. That idiom word-
 # splits on whitespace, so any value containing a space, quote or newline is
@@ -27,7 +27,7 @@ EOF
     exit 1
 fi
 
-echo "Starting the server-layer stack..."
+echo "Starting the spectre-server-layer stack..."
 
 # nginx will not start without a certificate; generation is idempotent.
 "$REPO_DIR/gen-dev-cert.sh"

@@ -34,7 +34,7 @@ updates:
     ignore:
       # Built locally from ../app by this same compose file. There is no registry
       # image behind this tag, so there is nothing for Dependabot to update.
-      - dependency-name: "server-layer-app"
+      - dependency-name: "spectre-server-layer-app"
     groups:
       compose-images:
         patterns:

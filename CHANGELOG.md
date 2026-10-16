@@ -39,6 +39,10 @@ recorded in the git log (`git log --oneline`).
 - `volumes/app` renamed to `app/`; `volumes/` now holds only nginx content.
 - `container_name` removed for parallel-safe, project-scoped stacks.
 - Images pinned to explicit tags.
+- Renamed to Spectre Server Layer, including the Compose project name, the
+  `spectre-server-layer-app:local` image tag, the `spectre-server-layer-app`
+  package name, and the Redis cache key prefix. The stack had never been
+  started under the old name, so no volumes or containers were left behind.
 
 ### Fixed
 

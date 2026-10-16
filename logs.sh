@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Follow logs from the server-layer stack.
+# Follow logs from the spectre-server-layer stack.
 #
 #   ./logs.sh              # every service
 #   ./logs.sh app          # one service

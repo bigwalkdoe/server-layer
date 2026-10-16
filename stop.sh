@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Stop the server-layer stack.
+# Stop the spectre-server-layer stack.
 #
 # Named volumes (postgres-data, redis-data, ollama-data) are preserved, so no
 # data is lost. Use `docker compose -f configs/docker-compose.yml down -v` if you
@@ -11,7 +11,7 @@ set -euo pipefail
 REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 cd "$REPO_DIR/configs"
 
-echo "Stopping the server-layer stack (volumes are preserved)..."
+echo "Stopping the spectre-server-layer stack (volumes are preserved)..."
 docker compose down --remove-orphans
 
 echo "Containers stopped."

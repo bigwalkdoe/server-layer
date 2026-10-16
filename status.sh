@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Show the state of the server-layer stack.
+# Show the state of the spectre-server-layer stack.
 
 set -uo pipefail
 

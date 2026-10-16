@@ -1,4 +1,4 @@
-# Server Layer — Docker Compose stack
+# Spectre Server Layer — Docker Compose stack
 #
 # Configuration comes from `configs/.env`. Compose loads that file automatically
 # because this file lives in the same directory; nothing needs to be exported by
@@ -13,7 +13,7 @@
 # be run twice in parallel (different -p / COMPOSE_PROJECT_NAME) without the two
 # copies fighting over container names.
 
-name: server-layer
+name: spectre-server-layer
 
 x-logging: &logging
   driver: json-file
@@ -85,7 +85,7 @@ services:
   app:
     build:
       context: ../app
-    image: server-layer-app:local
+    image: spectre-server-layer-app:local
     restart: unless-stopped
     environment:
       NODE_ENV: production
