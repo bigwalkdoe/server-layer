@@ -134,7 +134,14 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-appuser}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in configs/.env}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # Mounted at /var/lib/postgresql, not at a `data` subdirectory: from
+      # PostgreSQL 18 the image puts PGDATA in a major-version-specific
+      # directory (/var/lib/postgresql/18/docker) and refuses to start if it
+      # finds a mount at the old /var/lib/postgresql/data path. Mounting the
+      # whole directory keeps the version subdirectory inside the volume, which
+      # is also what makes `pg_upgrade --link` possible across a future major
+      # bump. See https://github.com/docker-library/postgres/issues/37.
+      - postgres-data:/var/lib/postgresql
     ports:
       # Bound to the loopback interface: reachable for debugging, not exposed
       # to the network.

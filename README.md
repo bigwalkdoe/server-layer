@@ -54,8 +54,8 @@ booting a database with a password that is effectively public knowledge.
 | Service | Image | Container port | Published as | Notes |
 |---|---|---|---|---|
 | `nginx` | `nginx:1.31-alpine` | 80, 443 | `0.0.0.0:8081`, `0.0.0.0:8443` | reverse proxy, static files, TLS |
-| `app` | built from `app/` (`node:24-alpine`) | 3000 | *not published* | reachable only through nginx |
-| `postgres` | `postgres:17-alpine` | 5432 | `127.0.0.1:5435` | loopback only |
+| `app` | built from `app/` (`node:25-alpine`) | 3000 | *not published* | reachable only through nginx |
+| `postgres` | `postgres:18-alpine` | 5432 | `127.0.0.1:5435` | loopback only |
 | `redis` | `redis:8-alpine` | 6379 | `127.0.0.1:6379` | loopback only, password required |
 | `ollama` | `ollama/ollama:0.40.4` | 11434 | `127.0.0.1:11434` | optional, `ai` profile — see below |
 

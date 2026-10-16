@@ -34,11 +34,17 @@ recorded in the git log (`git log --oneline`).
   Redis runs with `requirepass`.
 - Ollama moved behind the `ai` profile so it doesn't start by default.
 - `start.sh` reads real container ports instead of guessing from `.env`.
-- The application is built from `app/Dockerfile` (Node 24, non-root user)
+- The application is built from `app/Dockerfile` (Node 25, non-root user)
   instead of an inline heredoc.
 - `volumes/app` renamed to `app/`; `volumes/` now holds only nginx content.
 - `container_name` removed for parallel-safe, project-scoped stacks.
 - Images pinned to explicit tags.
+- Base images bumped by Dependabot: `node:24-alpine` → `node:25-alpine` and
+  `postgres:17-alpine` → `postgres:18-alpine`. To support the PostgreSQL 18
+  image, the `postgres-data` volume is now mounted at `/var/lib/postgresql`
+  instead of `/var/lib/postgresql/data` — the image puts PGDATA in a
+  major-version-specific subdirectory and refuses to start from the old
+  mount point. Existing volumes from PostgreSQL 17 must be re-initialized.
 - Renamed to Spectre Server Layer, including the Compose project name, the
   `spectre-server-layer-app:local` image tag, the `spectre-server-layer-app`
   package name, and the Redis cache key prefix. The stack had never been

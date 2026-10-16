@@ -45,7 +45,7 @@ updates:
     commit-message:
       prefix: "docker-compose"
 
-  # The application image's base: FROM node:24-alpine in app/Dockerfile.
+  # The application image's base: FROM node:25-alpine in app/Dockerfile.
   - package-ecosystem: "docker"
     directory: "/app"
     schedule:
@@ -60,5 +60,5 @@ updates:
     commit-message:
       prefix: "docker"
     # No ignore rule for the Node major: the group above covers minor and patch,
-    # so a major (24 -> 26) arrives as its own pull request. That keeps the
+    # so a major (25 -> 26) arrives as its own pull request. That keeps the
     # change isolated without hiding it.
